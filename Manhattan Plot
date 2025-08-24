@@ -1,0 +1,32 @@
+## Manhattan Plot based on chromosomes ##
+
+# Packages
+library(qqman)
+
+# Set the working directory
+setwd("/Users/emilyneff/Desktop/Master's Project/Fst")
+
+# Read in file
+fst <- read.table("file.weir.fst",sep='\t',header=TRUE)
+
+# Check number of variants
+dim(fst)
+colnames(fst)
+
+# Add snp column
+#because this data does not include snp name, we will add dummy names.
+#we do this by assigning a number to each snp.
+length_ <- dim(fst)[1]
+length_
+fst$SNP <- paste('SNP',1:length_)
+
+# Generate the manhattan plot
+# (optional) create a character vector to highlight snps of interest
+snps<- c("SNP 879953", "SNP 880029", "SNP 880063") 
+str(snps)
+
+# Change the colors of the plot
+manhattan(fst,chr='CHROM',bp='POS',
+          p="WEIR_AND_COCKERHAM_FST",snp='SNP', ,col=c("#3594ccff", "#0d7d87ff", "#f55f74ff", "#4a2377ff"),
+          logp=FALSE,ylab=' Fst- Weir and Cockerham',xlab='Chromosome #', cex = 0.5,
+          ylim = c(0, 1.05))
