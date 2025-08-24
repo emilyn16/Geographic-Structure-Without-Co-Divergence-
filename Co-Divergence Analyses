@@ -1,0 +1,43 @@
+## Procrustean Analysis of Cophylogeny ##
+#########################################
+
+library(paco)
+library(ape)
+
+# convert Newick files to class 'phylo'
+
+HostTree<-read.tree(file = "hosttree_newick.tre", text = NULL, tree.names = NULL, skip = 0, comment.char = "#", keep.multi = FALSE)
+SymbTree<-read.tree(file = "snippy10_newick.tre", text = NULL, tree.names = NULL, skip = 0, comment.char = "#", keep.multi = FALSE)
+
+# transform phylogenies to dist matrix
+HostMat <- cophenetic(HostTree)
+SymbMat<-cophenetic(SymbTree)
+
+# load links file (Host-Parasite)
+links<-read.csv(file="file.csv", sep=",", row.names=1)
+links<-as.matrix(links)
+
+# bundle data and add principal coordinates
+D<-prepare_paco_data(H=HostMat, P=SymbMat, HP=links)
+D<-add_pcoord(D, correction = "none")
+
+# perform cophylogenetic analysis
+D<-PACo(D, nperm=1000, seed=1000, method='r0', symmetric=T)
+
+# return interaction-specific cophylogenetic contributions based on jacknifing
+D<-paco_links(D)
+
+# return individual superimposition residuals
+res<-residuals_paco(D$proc)
+
+df <- data.frame(res)
+print(df)
+
+write_xlsx(df, "paco_res.xlsx")
+
+
+#### Parafit analysis ####
+#########################
+
+P<-parafit(HostMat, SymbMat, links, nperm=1000, seed=1000, correction = 'cailliez', test.links=T)
+
