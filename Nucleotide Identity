@@ -1,0 +1,62 @@
+## nucleotide identity ##
+library(vcfR)
+library(ape)
+
+setwd("~/your/working/directory")
+
+# Read VCF
+vcf <- read.vcfR("file.vcf")
+
+# Filter out multiallelic sites
+biallelic <- !grepl(",", vcf@fix[, "ALT"])
+vcf <- vcf[biallelic, ]
+
+# Extract genotype, REF, ALT
+gt <- extract.gt(vcf)
+ref <- vcf@fix[, "REF"]
+alt <- vcf@fix[, "ALT"]
+
+# Define populations
+pop1 <- c("J_10","J_11", "J_12","J_13","J_14", 
+          "J_15", "J_16","J_1","J_2","J_3",
+          "J_5","J_6","J_7","J_8","J_9")
+pop2 <- c("Ph_A1","Ph_B1", "Ph_A4","Ph_D1","Ph_D2", 
+          "Ph_D3", "Ph_D4","Ph_D5")
+
+# Calculation function
+calculate_identity <- function(sample_names, gt, ref, alt) {
+  gt_sub <- gt[, sample_names, drop = FALSE]
+  
+  convert_gt <- function(gt_value, ref_base, alt_base) {
+    if (is.na(gt_value) || gt_value %in% c("./.", ".", "")) return("N")
+    if (gt_value %in% c("0/0", "0|0")) return(ref_base)
+    if (gt_value %in% c("1/1", "1|1")) return(alt_base)
+    if (gt_value %in% c("0/1", "1/0", "0|1", "1|0")) return("N")
+    return("N")
+  }
+  
+  seq_mat <- matrix(NA, nrow = nrow(gt_sub), ncol = ncol(gt_sub),
+                    dimnames = list(NULL, colnames(gt_sub)))
+  
+  for (i in seq_len(ncol(gt_sub))) {
+    seq_mat[, i] <- mapply(convert_gt, gt_sub[, i], ref, alt)
+  }
+  
+  # Remove sites with >20% missing
+  keep <- apply(seq_mat, 1, function(x) mean(x == "N") < 0.2)
+  seq_mat <- seq_mat[keep, ]
+  
+  if (nrow(seq_mat) == 0) {
+    warning("No sites retained after filtering.")
+    return(list(pi = NA, identity = NA))
+  }
+  
+  dna_bin <- as.DNAbin(t(seq_mat))
+  pi <- nuc.div(dna_bin)
+  identity <- 1 - pi
+  return(list(pi = pi, identity = identity))
+}
+
+# Run on both populations
+pop1_result <- calculate_identity(pop1, gt, ref, alt)
+pop2_result <- calculate_identity(pop2, gt, ref, alt)
