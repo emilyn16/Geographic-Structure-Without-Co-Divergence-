@@ -1,0 +1,91 @@
+## Load libraries and functions ##
+library(RColorBrewer)
+library(viridis)
+library(wesanderson)
+library(ade4)
+library(adegenet)
+library(hierfstat)
+library(poppr)
+library(ape)
+library(ggplot2)
+library(stringr)
+library(scales)
+
+add.alpha <- function(col, alpha=1){
+  if(missing(col))
+    stop("Please provide a vector of colours.")
+  apply(sapply(col, col2rgb)/255, 2, 
+        function(x) 
+          rgb(x[1], x[2], x[3], alpha=alpha))  
+}
+
+
+# set working directory: setwd("your/working/directory")
+## Reading in data ##
+# 23 individuals;
+data <- read.genepop(("file.gen"), ncode = 3L)
+
+# Create options for 'population' column and split out MPHA by depth
+names <- str_split_fixed(rownames(data@tab), '_', 2)
+
+species <- substr(names[,1], 1, 4)
+id <- names[,2]
+
+species.table <- data.frame(id_full = rownames(data@tab), species = species)
+
+# Define colors
+colors_mpha <- c("#f55f74", "#0d7d87")
+show_col(colors_mpha)
+
+# Set 'population' for PCA colors
+species <- factor(species.table$species, levels = c('J', 'Ph')) 
+
+#### PCA of all Siphamia ####
+sum(is.na(data$tab)) 
+X <- scaleGen(data, NA.method = "mean")
+dim(X)
+class (X)
+
+# make PCA
+pca1 <- dudi.pca(X,cent=FALSE,scale=FALSE,scannf=FALSE,nf=10)
+barplot(pca1$eig[1:50],main="PCA eigenvalues", col=heat.colors(50))
+eig_percent <- round((pca1$eig/(sum(pca1$eig)))*100,2) # This is the percent variation explained by each axis
+eig_percent[1:10]
+
+# Plotting PC1 and PC2
+s.label(pca1$li)
+title("PCA of Siphamia\naxes 1-2")
+add.scatter.eig(pca1$eig[1:20], 3,1,2)
+
+s.class(pca1$li, pop(data)) 
+title("PCA of all Siphamia\naxes 1-2")
+add.scatter.eig(pca1$eig[1:20], 3,1,2)
+
+# By species, PC1 vs PC2
+png(file="/path/to/file.png", width=11, height=11, res=300, units="in")
+
+par(
+  mar=c(4, 5, 1, 1), # panel margin size in "line number" units
+  mgp=c(3, 1, 0), # default is c(3,1,0); line number for axis label, tick label, axis
+  tcl=-0.5, # size of tick marks as distance INTO figure (negative means pointing outward)
+  cex=1, # character expansion factor; keep as 1; if you have a many-panel figure, they start changing the deault!
+  ps=14, # point size, which is the font size
+  bty = 'n'
+)
+
+s.class(pca1$li, species, xax=3,yax=4, col = alpha(colors_mpha, 0.7), axesell=TRUE, cellipse=2, cstar=1,cpoint=1, grid=FALSE, addaxes = FALSE, xlim = c(-1200,1200), ylim = c(-1800,2000), clabel = 0)
+axis(1, at=seq(-1200,1200, by=200), labels=seq(-1200,1200, by=200), line = -6.5)
+axis(2, at=seq(-1000,1000, by=200), labels=seq(-1000,1000, by=200), line = -2.5, las = 2)
+mtext("PC3 (5.43%)", side = 1, line = -4.0)
+mtext("PC4 (4.69%)", side = 2, line = 1.5)
+
+legend(2000,5060,
+       legend=levels(species),
+       pch=19,
+       col = alpha(colors_mpha, 0.7),
+       bty = "n",
+       y.intersp = 0.9,
+       cex = 1)
+
+dev.off()
+
