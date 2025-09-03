@@ -1,7 +1,6 @@
 ## Species Level PCA ##
 
-#### Load libraries and functions ####
-
+## Load libraries and functions ##
 library(RColorBrewer)
 library(viridis)
 library(wesanderson)
