@@ -1,5 +1,4 @@
 ## Tanglegram ##
-################
 
 ## Load libraries and packages ##
 library(dendextend)
