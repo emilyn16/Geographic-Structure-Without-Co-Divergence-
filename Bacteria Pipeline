@@ -1,0 +1,48 @@
+## Bacteria Pipeline  ##
+# All steps performed on Moss2024, PhJ2022, and Japan2023 #
+# outgroups include: Ik8.2, ajapo4_1.fa, ajapo5.5.fa, ljone10_1.fa, lrivu4_1.fa
+
+#1. Download and trim raw fastq files 
+#trim files using fastp
+for i in *1.fq.gz
+do
+fastp --in1 $i --in2 ${i%%1.fq.gz}"2.fq.gz" --out1 ~/RawData/${i%%1.fq.gz}"R1.trim.fq.gz" –-out2 ~/RawData/${i%%1.fq.gz}"R2.trim.fq.gz" –-html ~/RawData/${i%%1.fq.gz}"wgs.html" -w 16 -l 50
+echo "${i}: Has been completed"
+done 
+
+#2. Align to reference 
+# BWA-mem
+for i in *R1.trim.fq.gz
+do
+bwa mem ~/reference/file.fasta $i ${i%%R1.trim.fq.gz}"R2.trim.fq.gz" > ~/Projects/${i%%R1.trim.fq.gz}"aligned.sam" -t 32
+echo "${i}: Has been completed"
+done 
+
+#3. creating two fastq outfiles from sam file
+#samtools fastq -1 r1.out -2 r2.out -F 12 samfile 
+for i in *aligned.sam
+do
+samtools fastq -1 ~/Projects/${i%%aligned.sam}"outfile1.fastq" -2 ~/Projects/${i%%aligned.sam}"outfile2.fastq" -F 12 $i
+echo "${i}: Has been completed"
+done 
+
+#4. Metaspades for genome assembly on all LO for Japan2023
+for i in *.outfile1.fastq 
+do 
+spades.py -o ~/Projects/${i%%outfile1.fastq}"" -1 ~/Projects/$i -2 ~/Projects/${i%%outfile1.fastq}"outfile2.fastq" -t 32 --cov-cutoff 15 --isolate
+echo "${i}: Has been completed"
+done 
+
+#5. Prokka for annotating bacterial sequences
+for i in *
+do
+prokka --compliant --centre node --kingdom Bacteria --outdir ~/Projects/prokka/${i} --genus Photobacterium --prefix ${i} ~/Projects/ragtag/${i}/ragtag.scaffold.fasta --cpus 32
+echo "${i}: Has been completed"
+done
+
+#6. Roary for pan-genome analysis
+roary --group_limit 70000 -f ~/Projects/roary -cd 95 -e -p 32 -v ~/Projects/file.gff
+
+#7. iqtree for phylogenetic tree
+iqtree -nt 32 -s core_gene_alignment.aln
+iqtree -s core_gene_alignment.aln -m GTR+F+R2 -bnni -bb 1000 -alrt 1000 -nt 32 -redo
