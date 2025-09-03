@@ -1,6 +1,6 @@
 ## Procrustean Analysis of Cophylogeny ##
 
-## Load Packages ##
+## Load Libraries and Packages ##
 library(paco)
 library(ape)
 
