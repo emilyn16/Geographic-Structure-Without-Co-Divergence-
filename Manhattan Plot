@@ -4,7 +4,7 @@
 library(qqman)
 
 # Set the working directory
-setwd("/Users/emilyneff/Desktop/Master's Project/Fst")
+setwd("/path/to/working/directory")
 
 # Read in file
 fst <- read.table("file.weir.fst",sep='\t',header=TRUE)
