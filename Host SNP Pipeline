@@ -1,0 +1,147 @@
+## Host SNP Pipeline ##
+#######################
+
+#1. Download and trim raw fastq files 
+#trim files using fastp
+for i in *1.fq.gz
+do
+fastp --in1 $i --in2 ${i%%1.fq.gz}"2.fq.gz" --out1 ~/RawData/${i%%1.fq.gz}"R1.trim.fq.gz" --out2 ~/RawData/${i%%1.fq.gz}"R2.trim.fq.gz" –-html   ~/RawData/${i%%1.fq.gz}"wgs.html" -w 16 -l 50
+echo "${i}: Has been completed"
+done 
+
+#2. Align to reference S. tubifer
+# BWA-mem
+for i in J*R1.trim.fq.gz
+do
+bwa mem ~/reference.fasta $i ${i%%R1.trim.fq.gz}"R2.trim.fq.gz" > ~/Projects/${i%%R1.trim.fq.gz}"aligned.sam" -t 32
+echo "${i}: Has been completed"
+done 
+
+#3. change file extension from sam to bam files
+for i in *aligned.sam
+do
+samtools view -S -b ~/Projects/$i > ~/Projects/${i%%aligned.sam}"aligned.bam"
+echo "${i}: Has been completed"
+done
+
+#4. filter paired reads
+#Filter in PAIRED reads; filter out unmapped (0x1)(UNMAP) and mapped whose mate is not mapped (0xC)(MUNMAP). 
+for i in *aligned.bam
+do
+samtools view -b -F 0xC -f 0x1 $i > ~/Projects/${i%%aligned.bam}"paired.bam"
+echo "${i}: Has been completed"
+done
+
+#5. samtools sort after paired bam
+for i in *paired.bam
+do
+samtools sort $i > ~/Projects/${i%%paired.bam}"sort.bam"
+echo "${i}: Has been completed"
+done
+
+#6. deduplicate sorted bam files
+nano picard.sh
+picard MarkDuplicates REMOVE_DUPLICATES=true INPUT=$1.sort.bam OUTPUT=~/Projects/$1.dedup.bam METRICS_FILE=~/Projects/$1.metrics.txt VALIDATION_STRINGENCY=LENIENT -XX:ParallelGCThreads=10
+sample=()
+for i in ${sample[@]};
+do
+bash picard.sh $i 
+echo $i
+done
+
+#7. add read groups to each sample before GATK haplotype caller
+picard AddOrReplaceReadGroups \
+    I= $1.dedup.bam \
+    O= $1.deduped_RG.bam \
+    SORT_ORDER=coordinate \
+    RGID=1 \
+    RGLB=lib1 \
+    RGPL=illumina \
+    RGPU=unit1 \
+    RGSM=$1 \
+    CREATE_INDEX=True
+
+sample=()
+for i in ${sample[@]};
+do
+bash readgroups.sh $i 
+echo $i
+done 
+
+#8. index deduped samples 
+for i in *dedup.bam
+do
+samtools index -b $i
+echo "${i}: Has been completed"
+done
+
+#9. create vcf files based on chromosome 
+gatk HaplotypeCaller \
+   -R /stubifer.fasta \
+   -I $1.dedup_RG.bam \
+   -L $2 \
+   -O $1_$2.g.vcf \
+   -ERC GVCF
+-R: where the reference genome is
+-L: chromosome 
+sample=()
+chrs=()
+for i in ${sample[@]};
+do
+    for j in ${chrs[@]};
+    do
+        bash haplo_chr.sh $i $j 
+        done    
+done
+
+#10. group chromosomes together
+gatk CombineGVCFs \
+ 	  -R /stubifer.fasta \
+	  -V $1_chr1.g.vcf \
+      -V $1_chr1.g.vcf \
+      -O ~/Projects/$1.chr1.g.vcf
+sample=()
+for i in ${sample[@]};
+do
+bash combine.sh $i
+done 
+
+#11. Genotype vcfs for joint genotyping: analyzing genetic variants across multiple individuals 
+# aims to identify and characterize genetic variants
+gatk GenotypeGVCFs \
+   -R /stubifer.fasta \
+   -V $1.sort.g.vcf.gz \
+   -O $1.genotyped.vcf.gz
+
+gatk GenotypeGVCFs \
+   -R /stubifer.fasta \
+   -V $1.g.vcf \
+   -O $1.genotyped.vcf.gz
+   
+sample=()
+for i in ${sample[@]};
+do
+bash genotype.sh $i 
+done
+
+#13. filter each genotyped sample 
+#filter individual chromosomes GATK
+vcftools --gzvcf file.vcf.gz \
+--remove-indels --maf 0.05 --max-missing 0.95 --minQ 30 \
+--minDP 8 --maxDP 60 --recode --stdout | gzip -c > \
+file_filtered.vcf.gz
+
+#14. index vcf files for bcftools
+for i in *vcf.gz
+do
+bcftools index $i 
+done
+
+#15. create consensus files for each individual
+bcftools consensus -f ~/references/stubifer.fasta filtered_vcf.gz -o file_filtered.fasta
+
+#16. gather all chromosomes into one vcf file for merging using bcftools concat
+bcftools concat -a filtered_1_vcf.gz  filtered_2_vcf.gz  filtered_3_vcf.gz  -o merge_filtered_chrom.vcf.gz
+
+
+	
