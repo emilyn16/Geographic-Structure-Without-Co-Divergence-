@@ -1,6 +1,6 @@
 ## Manhattan Plot based on chromosomes ##
 
-# Packages
+## Load Libraries and Packages ##
 library(qqman)
 
 # Set the working directory
