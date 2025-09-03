@@ -1,0 +1,39 @@
+## Phylogenetic Tree based on CO1 sequences ##
+
+## 1.run bwa mem to create sam files - includes read groups ## 
+for i in *R1.trim.fq.gz
+do
+bwa mem -M -t 1 -R $(echo "@RG\tID:$1\tLB:$1\tSM:$1\tPL:ILLUMINA\tPU:1") ~/reference.fasta $i ${i%%R1.trim.fq.gz}"R2.trim.fq.gz" > ~/Projects/co1/${i%%R1.trim.fq.gz}"aligned.sam" -t 32
+echo "${i}: Has been completed"
+done 
+
+## 2.create a script and assign it to samtools.sh
+for i in *aligned.sam
+do
+samtools view -S -b ~/Projects/co1/$i > ~/Projects/co1/${i%%aligned.sam}"aligned.bam"
+echo "${i}: Has been completed"
+done
+
+## 3.samtools sort used for sorting the alignments by leftmost coordinates ##
+for i in *aligned.bam
+do
+samtools sort $i > ~/Projects/co1/${i%%aligned.bam}"sorted.bam"
+echo "${i}: Has been completed"
+done
+
+## 4.samtools index
+for i in *sorted.bam
+do
+samtools index $i --threads 32
+echo "${i}: Has been completed"
+done
+
+## 5.samtools consensus used to generate a consensus fasta file from a bam file 
+for i in *sorted.bam
+do
+samtools consensus -f fasta $i -o ${i%%sorted.bam}"consensus.fasta"
+echo "${i}: Has been completed"
+done
+ 
+## 5.run .fasta files in blast
+## 6.created a multi-alignment (.aln) using AliView to create a fish tree to determine where my samples group
