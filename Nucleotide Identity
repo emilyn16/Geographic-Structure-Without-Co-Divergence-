@@ -1,4 +1,6 @@
-## nucleotide identity ##
+## Nucleotide Identity ##
+
+## Load Libraries and Packages ##
 library(vcfR)
 library(ape)
 
